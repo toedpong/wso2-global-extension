@@ -66,20 +66,9 @@
                     <property name="userId" expression="get-property('api.ut.userId')" type="STRING"/>
                     <property name="clientId" expression="get-property('api.ut.consumerKey')" type="STRING"/>
                     
-                    <property name="contentTypeStr" expression="$axis2:ContentType" type="STRING"/>
-                    <property name="reqPayload" value="No Payload" type="STRING"/>
-                    <filter xpath="$ctx:httpMethod = 'POST' or $ctx:httpMethod = 'PUT' or $ctx:httpMethod = 'PATCH'">
-                        <then>
-                            <filter regex="(?i).*json.*" source="$ctx:contentTypeStr">
-                                <then>
-                                    <property name="reqPayload" expression="json-eval($)" type="STRING"/>
-                                </then>
-                                <otherwise>
-                                    <property name="reqPayload" expression="$body/*" type="STRING"/>
-                                </otherwise>
-                            </filter>
-                        </then>
-                    </filter>
+                    <sequence key="Capture-Payload-Seq"/>
+                    <property name="reqPayload" expression="$ctx:capturedPayload" type="STRING"/>
+                    <property name="reqPayloadFormat" expression="$ctx:capturedPayloadFormat" type="STRING"/>
                     
                     <!-- เก็บ Transport Header ทั้งหมดเป็น JSON (mask ค่า credential) เพื่อใช้ replay ใน unit test -->
                     <script language="js"><![CDATA[
@@ -112,8 +101,8 @@
                         <statement>
                             <sql><![CDATA[
                                 INSERT INTO public.api_request_log_for_migration
-                                (MESSAGE_ID, API_NAME, API_VERSION, FULL_URL, RESOURCE_PATH, HTTP_METHOD, CONTENT_TYPE, CLIENT_IP, APP_NAME, USER_ID, CLIENT_ID, REQUEST_HEADERS, REQUEST_DATA, REQUEST_TIME) 
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS TIMESTAMP))
+                                (MESSAGE_ID, API_NAME, API_VERSION, FULL_URL, RESOURCE_PATH, HTTP_METHOD, CONTENT_TYPE, CLIENT_IP, APP_NAME, USER_ID, CLIENT_ID, REQUEST_HEADERS, REQUEST_DATA, REQUEST_FORMAT, REQUEST_TIME) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS TIMESTAMP))
                             ]]></sql>
                             <parameter expression="$ctx:ReqMessageID" type="VARCHAR"/>
                             <parameter expression="$ctx:apiName" type="VARCHAR"/>
@@ -128,6 +117,7 @@
                             <parameter expression="$ctx:clientId" type="VARCHAR"/>
                             <parameter expression="$ctx:reqHeadersJson" type="VARCHAR"/>
                             <parameter expression="$ctx:reqPayload" type="VARCHAR"/>
+                            <parameter expression="$ctx:reqPayloadFormat" type="VARCHAR"/>
                             <parameter expression="$ctx:requestTime" type="VARCHAR"/> 
                         </statement>
                     </dbreport>
