@@ -1,3 +1,3 @@
 <sequence name="WSO2AM--Ext--Out" xmlns="http://ws.apache.org/ns/synapse">
-    <sequence key="Custom-DBLogger-Seq"/>
+    <sequence key="Custom-DBLogger-Out-Seq"/>
 </sequence>
