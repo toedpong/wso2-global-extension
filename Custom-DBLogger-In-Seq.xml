@@ -1,86 +1,134 @@
 <sequence name="Custom-DBLogger-In-Seq" xmlns="http://ws.apache.org/ns/synapse">
-    
-    <!-- 1. ดึงชื่อ API ของ Request ปัจจุบัน -->
-    <property name="currentApiName" expression="get-property('API_NAME')" type="STRING"/>
-    
-    <!-- 2. ดึงค่าจาก Local Entry (MigrationAPIList) -->
+<property name="currentApiName" expression="get-property('API_NAME')" type="STRING"/>
     <property name="migrationListXml" expression="get-property('MigrationAPIList')" type="OM"/>
-    
-    <!-- 3. ตรวจสอบว่า API ปัจจุบันอยู่ใน List XML หรือไม่ -->
     <property name="isMigrationAPI" 
               expression="boolean($ctx:migrationListXml//*[local-name()='api'][text() = $ctx:currentApiName])" 
               type="STRING"/>
 
-    <!-- ========================================== -->
-    <!-- 4. Log ค่าทุกอย่างออกมาดูใน wso2carbon.log -->
-    <!-- ========================================== -->
     <log level="custom">
         <property name="DEBUG_STATUS" value="--- Checking Migration API List ---"/>
         <property name="DEBUG_CURRENT_API" expression="$ctx:currentApiName"/>
-        <property name="DEBUG_READ_LOCAL_ENTRY" expression="$ctx:migrationListXml"/>
-        <property name="DEBUG_IS_MATCHED" expression="$ctx:isMigrationAPI"/>
     </log>
 
-    <!-- 5. กรองเฉพาะ Request ที่ได้ค่า isMigrationAPI เป็น true -->
     <filter source="$ctx:isMigrationAPI" regex="true">
         <then>
             
-            <log level="custom">
-                <property name="DEBUG_STATUS" value="--- API Matched! Saving to DB ---"/>
-            </log>
-
-            <!-- ดึงข้อมูล API และ Request -->
-            <property name="apiName" expression="get-property('API_NAME')" type="STRING"/>
-            <property name="apiVersion" expression="get-property('API_VERSION')" type="STRING"/>
-            <property name="fullUrl" expression="get-property('To')" type="STRING"/>
-            <property name="httpMethod" expression="$axis2:HTTP_METHOD" type="STRING"/>
-            <property name="messageId" expression="get-property('MessageID')" type="STRING"/>
-            <property name="contentType" expression="$trp:Content-Type" type="STRING"/>
-            <property name="clientIp" expression="get-property('axis2', 'REMOTE_ADDR')" type="STRING"/>
-            
-            <!-- ดึงข้อมูล Consumer App และ User -->
-            <property name="appName" expression="get-property('api.ut.application.name')" type="STRING"/>
-            <property name="consumerKey" expression="get-property('api.ut.consumerKey')" type="STRING"/>
-            <property name="userId" expression="get-property('api.ut.userId')" type="STRING"/>
-            
-            <!-- ดึง Payload -->
-            <property name="reqPayload" expression="json-eval($)" type="STRING"/>
-
-            <!-- บันทึกลง Database (PostgreSQL - Schema pipo) -->
-            <dbreport>
+            <!-- 🌟 1. ดึงข้อมูล Count ล่าสุดมา -->
+            <dblookup>
                 <connection>
                     <pool>
                         <driver>org.postgresql.Driver</driver>
-                        <url>jdbc:postgresql://10.224.146.29:5551/sharedev</url>
-                        <user>apimadmin</user>
-                        <password>u7sHyI1$</password>
+                        <url>jdbc:postgresql://10.224.146.29:5551/cpidev</url>
+                        <user>cpiadmin</user>
+                        <password>zQ3!U#4gB_J1H4tw</password>
                     </pool>
                 </connection>
                 <statement>
-                    <!-- เพิ่มคอลัมน์ CONSUMER_KEY ใน SQL และเพิ่ม ? เป็น 11 ตัว -->
-                    <sql><![CDATA[
-                        INSERT INTO pipo.api_request_log_for_migration
-                        (MESSAGE_ID, API_NAME, API_VERSION, FULL_URL, HTTP_METHOD, CONTENT_TYPE, CLIENT_IP, APP_NAME, CONSUMER_KEY, USER_ID, PAYLOAD) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ]]></sql>
-                    <parameter expression="$ctx:messageId" type="VARCHAR"/>
-                    <parameter expression="$ctx:apiName" type="VARCHAR"/>
-                    <parameter expression="$ctx:apiVersion" type="VARCHAR"/>
-                    <parameter expression="$ctx:fullUrl" type="VARCHAR"/>
-                    <parameter expression="$ctx:httpMethod" type="VARCHAR"/>
-                    <parameter expression="$ctx:contentType" type="VARCHAR"/>
-                    <parameter expression="$ctx:clientIp" type="VARCHAR"/>
-                    <parameter expression="$ctx:appName" type="VARCHAR"/>
-                    <parameter expression="$ctx:consumerKey" type="VARCHAR"/>
-                    <parameter expression="$ctx:userId" type="VARCHAR"/>
-                    <parameter expression="$ctx:reqPayload" type="VARCHAR"/>
+                    <sql><![CDATA[SELECT count AS apicount FROM pipo.api WHERE apiname = ?]]></sql>
+                    <parameter expression="$ctx:currentApiName" type="VARCHAR"/>
+                    <result name="apiHitCount" column="apicount"/>
                 </statement>
-            </dbreport>
+            </dblookup>
 
+            <!-- 🌟 2. ตัวแปรเก็บสถานะว่า "เกินโควต้าหรือยัง?" (Default = false) -->
+            <property name="IS_COUNT_LIMIT_REACHED" value="false" type="STRING"/>
+            
+            <!-- 🌟 3. ถ้าแปลงตัวเลขแล้วมีค่า >= 10 ถึงจะอัปเดตสถานะเป็น true -->
+            <filter xpath="boolean($ctx:apiHitCount) and number($ctx:apiHitCount) &gt;= 10">
+                <then>
+                    <property name="IS_COUNT_LIMIT_REACHED" value="true" type="STRING"/>
+                </then>
+            </filter>
+
+            <!-- 🌟 4. กรองการทำงาน: จะบันทึกก็ต่อเมื่อยังไม่ถึง Limit (false) -->
+            <filter source="$ctx:IS_COUNT_LIMIT_REACHED" regex="false">
+                <then>
+                    <!-- ส่ง Flag นี้ไปให้ Out-Seq เพื่อรับรู้ว่าต้องอัปเดตต่อ -->
+                    <property name="IS_MIGRATION_LOGGED" value="true" type="STRING"/>
+                    
+                    <log level="custom">
+                        <property name="DEBUG_STATUS" value="--- API Matched & Count < 10! Saving to DB ---"/>
+                        <property name="CURRENT_COUNT" expression="$ctx:apiHitCount"/>
+                    </log>
+                    
+                    <property name="reqStartTimeMs" expression="get-property('SYSTEM_TIME')" scope="default" type="LONG"/>
+                    <property name="requestTime" expression="get-property('SYSTEM_DATE', 'yyyy-MM-dd HH:mm:ss.SSS')" type="STRING"/>
+                    <property name="apiName" expression="get-property('API_NAME')" type="STRING"/>
+                    <property name="apiVersion" expression="get-property('API_VERSION')" type="STRING"/>
+                    <property name="fullUrl" expression="get-property('To')" type="STRING"/>
+                    <property name="httpMethod" expression="$axis2:HTTP_METHOD" type="STRING"/>
+                    <property name="ReqMessageID" expression="get-property('MessageID')" scope="default" type="STRING"/>
+                    <property name="contentType" expression="$trp:Content-Type" type="STRING"/>
+                    <property name="clientIp" expression="get-property('axis2', 'REMOTE_ADDR')" type="STRING"/>
+                    
+                    <property name="appName" expression="get-property('api.ut.application.name')" type="STRING"/>
+                    <property name="userId" expression="get-property('api.ut.userId')" type="STRING"/>
+                    <property name="clientId" expression="get-property('api.ut.consumerKey')" type="STRING"/>
+                    
+                    <property name="contentTypeStr" expression="$axis2:ContentType" type="STRING"/>
+                    <filter regex="(?i).*json.*" source="$ctx:contentTypeStr">
+                        <then>
+                            <property name="reqPayload" expression="json-eval($)" type="STRING"/>
+                        </then>
+                        <otherwise>
+                            <property name="reqPayload" expression="$body/*" type="STRING"/>
+                        </otherwise>
+                    </filter>
+                    
+                    <property name="reqHeadersStr" 
+                            expression="fn:concat('{', 
+                                'Content-Type=', $trp:Content-Type, ', ',
+                                'X-Application-Name=', $trp:X-Application-Name, ', ',
+                                'X-User-ID=', $trp:X-User-ID, ', ',
+                                'X-Client-ID=', $trp:X-Client-ID, 
+                            '}')" 
+                            type="STRING"/>
+
+                    <property name="combinedData" 
+                              expression="fn:concat('[HEADERS]&#10;', $ctx:reqHeadersStr, '&#10;[PAYLOAD]&#10;', $ctx:reqPayload)" 
+                              type="STRING"/>
+
+                    <dbreport>
+                        <connection>
+                            <pool>
+                                <driver>org.postgresql.Driver</driver>
+                                <url>jdbc:postgresql://10.224.146.29:5551/cpidev</url>
+                                <user>cpiadmin</user>
+                                <password>zQ3!U#4gB_J1H4tw</password>
+                            </pool>
+                        </connection>
+                        <statement>
+                            <sql><![CDATA[
+                                INSERT INTO public.api_request_log_for_migration
+                                (MESSAGE_ID, API_NAME, API_VERSION, FULL_URL, HTTP_METHOD, CONTENT_TYPE, CLIENT_IP, APP_NAME, USER_ID, CLIENT_ID, REQUEST_DATA, REQUEST_TIME) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS TIMESTAMP))
+                            ]]></sql>
+                            <parameter expression="$ctx:ReqMessageID" type="VARCHAR"/>
+                            <parameter expression="$ctx:apiName" type="VARCHAR"/>
+                            <parameter expression="$ctx:apiVersion" type="VARCHAR"/>
+                            <parameter expression="$ctx:fullUrl" type="VARCHAR"/>
+                            <parameter expression="$ctx:httpMethod" type="VARCHAR"/>
+                            <parameter expression="$ctx:contentType" type="VARCHAR"/>
+                            <parameter expression="$ctx:clientIp" type="VARCHAR"/>
+                            <parameter expression="$ctx:appName" type="VARCHAR"/>
+                            <parameter expression="$ctx:userId" type="VARCHAR"/>
+                            <parameter expression="$ctx:clientId" type="VARCHAR"/>
+                            <parameter expression="$ctx:combinedData" type="VARCHAR"/>
+                            <parameter expression="$ctx:requestTime" type="VARCHAR"/> 
+                        </statement>
+                    </dbreport>
+                </then>
+                <else>
+                    <log level="custom">
+                        <property name="DEBUG_STATUS" value="--- Limit Reached! (Count >= 10). Skipping DB Log. ---"/>
+                        <property name="API_NAME" expression="$ctx:currentApiName"/>
+                        <property name="CURRENT_COUNT" expression="$ctx:apiHitCount"/>
+                    </log>
+                </else>
+            </filter>
         </then>
         <else>
             <!-- ไม่ตรงกับ List ระบบปล่อยผ่าน -->
         </else>
     </filter>
-    
 </sequence>

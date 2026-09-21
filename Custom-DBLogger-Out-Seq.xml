@@ -1,0 +1,84 @@
+<sequence name="Custom-DBLogger-Out-Seq" xmlns="http://ws.apache.org/ns/synapse">
+    
+    <!-- 🌟 1. รับค่า Flag จาก In-Seq มาเช็ค (ประหยัดการทำ List XML ใหม่ และแม่นยำกว่า) -->
+    <property name="checkLogFlag" expression="get-property('IS_MIGRATION_LOGGED')" type="STRING"/>
+
+    <filter source="$ctx:checkLogFlag" regex="true">
+        <then>
+            <property name="messageId" expression="get-property('ReqMessageID')" type="STRING"/>
+            <property name="currentApiName" expression="get-property('API_NAME')" type="STRING"/>
+            <property name="httpStatus" expression="get-property('axis2', 'HTTP_SC')" type="STRING"/>
+            
+            <property name="respContentTypeStr" expression="$axis2:ContentType" type="STRING"/>
+            <filter regex="(?i).*json.*" source="$ctx:respContentTypeStr">
+                <then>
+                    <property name="respData" expression="json-eval($)" type="STRING"/>
+                </then>
+                <otherwise>
+                    <property name="respData" expression="$body/*" type="STRING"/>
+                </otherwise>
+            </filter>
+            
+            <property name="respHeadersStr" 
+                    expression="fn:concat('{', 
+                        'Content-Type=', $trp:Content-Type,
+                    '}')" 
+                    type="STRING"/>
+
+            <property name="combinedRespData" 
+                      expression="fn:concat('[HEADERS] ', $ctx:respHeadersStr, '&#10;[RESPONSE DATA] ', $ctx:respData)" 
+                      type="STRING"/>
+            
+            <property name="responseTime" expression="get-property('SYSTEM_DATE', 'yyyy-MM-dd HH:mm:ss.SSS')" type="STRING"/>
+            <property name="respEndTimeMs" expression="get-property('SYSTEM_TIME')" type="LONG"/>
+
+            <script language="js"><![CDATA[
+                var startMs = mc.getProperty("reqStartTimeMs");
+                var endMs = mc.getProperty("respEndTimeMs");
+                var duration = 0;
+                
+                if (startMs != null && endMs != null) {
+                    duration = parseInt(endMs) - parseInt(startMs);
+                }
+                
+                mc.setProperty("apiDurationMs", duration.toString());
+            ]]></script>
+            
+            <dbreport>
+                <connection>
+                    <pool>
+                        <driver>org.postgresql.Driver</driver>
+                        <url>jdbc:postgresql://10.224.146.29:5551/cpidev</url>
+                        <user>cpiadmin</user>
+                        <password>zQ3!U#4gB_J1H4tw</password>
+                    </pool>
+                </connection>
+                
+                <!-- อัปเดตข้อมูล Response ลง Log ขาออก -->
+                <statement>
+                    <sql><![CDATA[
+                        UPDATE public.api_request_log_for_migration
+                        SET RESPONSE_DATA = ?, HTTP_STATUS = ?, RESPONSE_TIME = CAST(? AS TIMESTAMP), EXECUTION_TIME_MS = CAST(? AS BIGINT)
+                        WHERE MESSAGE_ID = ?
+                    ]]></sql>
+                    <parameter expression="$ctx:combinedRespData" type="VARCHAR"/>
+                    <parameter expression="$ctx:httpStatus" type="VARCHAR"/>
+                    <parameter expression="$ctx:responseTime" type="VARCHAR"/>
+                    <parameter expression="$ctx:apiDurationMs" type="VARCHAR"/>
+                    <parameter expression="$ctx:messageId" type="VARCHAR"/>
+                </statement>
+                
+                <!-- 🌟 2. อัปเดต Count โดยใช้เงื่อนไขล็อกตายระดับฐานข้อมูล (ใช้ api.count) -->
+                <statement>
+                    <sql><![CDATA[
+                        INSERT INTO public.api (apiname, count)
+                        VALUES (?, 1)
+                        ON CONFLICT (apiname) 
+                        DO UPDATE SET count = api.count + 1 WHERE api.count < 10
+                    ]]></sql>
+                    <parameter expression="$ctx:currentApiName" type="VARCHAR"/>
+                </statement>
+            </dbreport>
+        </then>
+    </filter>
+</sequence>
