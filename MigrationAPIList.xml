@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<localEntry key="MigrationAPIList" xmlns="http://ws.apache.org/ns/synapse">
+    <!-- ระบุรายชื่อ API_NAME ที่ต้องการทำ Migration ไว้ตรงนี้ -->
+    <apiList>
+        <api>OR_EORDER_LookUp</api>
+        <api>OR_POSCLOUD_SelfServe</api>
+        <api>OR_ETAXPCC_Token</api>
+    </apiList>
+</localEntry>

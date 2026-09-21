@@ -1,0 +1,31 @@
+<sequence xmlns="http://ws.apache.org/ns/synapse" name="Send-Header-Seq">
+    <!-- ตรวจสอบก่อนว่ามีค่า App Name หรือไม่ (กันพังสำหรับ API ที่ไม่ได้ require token) -->
+    <filter source="boolean(get-property('api.ut.application.name'))" regex="true">
+        <then>
+            <property name="X-Application-Name" expression="get-property('api.ut.application.name')" scope="transport" type="STRING"/>
+        </then>
+        <otherwise>
+            <!-- ถ้าไม่มี Token (เช่น Unauthenticated API) ให้ส่งค่าว่างหรือข้ามไป -->
+        </otherwise>
+    </filter>
+
+    <!-- 2. ดึงค่า User ID (End User) และตั้งเป็น Header -->
+    <filter source="boolean(get-property('api.ut.userId'))" regex="true">
+        <then>
+            <property name="X-User-ID" expression="get-property('api.ut.userId')" scope="transport" type="STRING"/>
+        </then>
+        <otherwise>
+            <!-- กรณีไม่มีค่า ให้ข้ามไป -->
+        </otherwise>
+    </filter>
+
+    <!-- 3. ดึงค่า Client ID (Consumer Key) -->
+    <filter source="boolean(get-property('api.ut.consumerKey'))" regex="true">
+        <then>
+            <property name="X-Client-ID" expression="get-property('api.ut.consumerKey')" scope="transport" type="STRING"/>
+        </then>
+        <otherwise>
+            <!-- กรณีไม่มีค่า ให้ข้ามไป -->
+        </otherwise>
+    </filter>
+</sequence>

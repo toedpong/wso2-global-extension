@@ -1,0 +1,4 @@
+<sequence name="WSO2AM--Ext--In" xmlns="http://ws.apache.org/ns/synapse">
+    <sequence key="Send-Header-Seq"/>
+    <sequence key="Custom-DBLogger-Seq"/>
+</sequence>

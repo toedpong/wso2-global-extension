@@ -1,0 +1,86 @@
+<sequence name="Custom-DBLogger-In-Seq" xmlns="http://ws.apache.org/ns/synapse">
+    
+    <!-- 1. ดึงชื่อ API ของ Request ปัจจุบัน -->
+    <property name="currentApiName" expression="get-property('API_NAME')" type="STRING"/>
+    
+    <!-- 2. ดึงค่าจาก Local Entry (MigrationAPIList) -->
+    <property name="migrationListXml" expression="get-property('MigrationAPIList')" type="OM"/>
+    
+    <!-- 3. ตรวจสอบว่า API ปัจจุบันอยู่ใน List XML หรือไม่ -->
+    <property name="isMigrationAPI" 
+              expression="boolean($ctx:migrationListXml//*[local-name()='api'][text() = $ctx:currentApiName])" 
+              type="STRING"/>
+
+    <!-- ========================================== -->
+    <!-- 4. Log ค่าทุกอย่างออกมาดูใน wso2carbon.log -->
+    <!-- ========================================== -->
+    <log level="custom">
+        <property name="DEBUG_STATUS" value="--- Checking Migration API List ---"/>
+        <property name="DEBUG_CURRENT_API" expression="$ctx:currentApiName"/>
+        <property name="DEBUG_READ_LOCAL_ENTRY" expression="$ctx:migrationListXml"/>
+        <property name="DEBUG_IS_MATCHED" expression="$ctx:isMigrationAPI"/>
+    </log>
+
+    <!-- 5. กรองเฉพาะ Request ที่ได้ค่า isMigrationAPI เป็น true -->
+    <filter source="$ctx:isMigrationAPI" regex="true">
+        <then>
+            
+            <log level="custom">
+                <property name="DEBUG_STATUS" value="--- API Matched! Saving to DB ---"/>
+            </log>
+
+            <!-- ดึงข้อมูล API และ Request -->
+            <property name="apiName" expression="get-property('API_NAME')" type="STRING"/>
+            <property name="apiVersion" expression="get-property('API_VERSION')" type="STRING"/>
+            <property name="fullUrl" expression="get-property('To')" type="STRING"/>
+            <property name="httpMethod" expression="$axis2:HTTP_METHOD" type="STRING"/>
+            <property name="messageId" expression="get-property('MessageID')" type="STRING"/>
+            <property name="contentType" expression="$trp:Content-Type" type="STRING"/>
+            <property name="clientIp" expression="get-property('axis2', 'REMOTE_ADDR')" type="STRING"/>
+            
+            <!-- ดึงข้อมูล Consumer App และ User -->
+            <property name="appName" expression="get-property('api.ut.application.name')" type="STRING"/>
+            <property name="consumerKey" expression="get-property('api.ut.consumerKey')" type="STRING"/>
+            <property name="userId" expression="get-property('api.ut.userId')" type="STRING"/>
+            
+            <!-- ดึง Payload -->
+            <property name="reqPayload" expression="json-eval($)" type="STRING"/>
+
+            <!-- บันทึกลง Database (PostgreSQL - Schema pipo) -->
+            <dbreport>
+                <connection>
+                    <pool>
+                        <driver>org.postgresql.Driver</driver>
+                        <url>jdbc:postgresql://10.224.146.29:5551/sharedev</url>
+                        <user>apimadmin</user>
+                        <password>u7sHyI1$</password>
+                    </pool>
+                </connection>
+                <statement>
+                    <!-- เพิ่มคอลัมน์ CONSUMER_KEY ใน SQL และเพิ่ม ? เป็น 11 ตัว -->
+                    <sql><![CDATA[
+                        INSERT INTO pipo.api_request_log_for_migration
+                        (MESSAGE_ID, API_NAME, API_VERSION, FULL_URL, HTTP_METHOD, CONTENT_TYPE, CLIENT_IP, APP_NAME, CONSUMER_KEY, USER_ID, PAYLOAD) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ]]></sql>
+                    <parameter expression="$ctx:messageId" type="VARCHAR"/>
+                    <parameter expression="$ctx:apiName" type="VARCHAR"/>
+                    <parameter expression="$ctx:apiVersion" type="VARCHAR"/>
+                    <parameter expression="$ctx:fullUrl" type="VARCHAR"/>
+                    <parameter expression="$ctx:httpMethod" type="VARCHAR"/>
+                    <parameter expression="$ctx:contentType" type="VARCHAR"/>
+                    <parameter expression="$ctx:clientIp" type="VARCHAR"/>
+                    <parameter expression="$ctx:appName" type="VARCHAR"/>
+                    <parameter expression="$ctx:consumerKey" type="VARCHAR"/>
+                    <parameter expression="$ctx:userId" type="VARCHAR"/>
+                    <parameter expression="$ctx:reqPayload" type="VARCHAR"/>
+                </statement>
+            </dbreport>
+
+        </then>
+        <else>
+            <!-- ไม่ตรงกับ List ระบบปล่อยผ่าน -->
+        </else>
+    </filter>
+    
+</sequence>
