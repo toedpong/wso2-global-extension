@@ -24,7 +24,7 @@
                     </pool>
                 </connection>
                 <statement>
-                    <sql><![CDATA[SELECT count AS apicount FROM pipo.api WHERE apiname = ?]]></sql>
+                    <sql><![CDATA[SELECT count AS apicount FROM public.api WHERE apiname = ?]]></sql>
                     <parameter expression="$ctx:currentApiName" type="VARCHAR"/>
                     <result name="apiHitCount" column="apicount"/>
                 </statement>
@@ -47,7 +47,7 @@
                     <property name="IS_MIGRATION_LOGGED" value="true" type="STRING"/>
                     
                     <log level="custom">
-                        <property name="DEBUG_STATUS" value="--- API Matched & Count < 10! Saving to DB ---"/>
+                        <property name="DEBUG_STATUS" value="--- API Matched &amp; Count &lt; 10! Saving to DB ---"/>
                         <property name="CURRENT_COUNT" expression="$ctx:apiHitCount"/>
                     </log>
                     
@@ -66,27 +66,23 @@
                     <property name="clientId" expression="get-property('api.ut.consumerKey')" type="STRING"/>
                     
                     <property name="contentTypeStr" expression="$axis2:ContentType" type="STRING"/>
-                    <filter regex="(?i).*json.*" source="$ctx:contentTypeStr">
+                    <property name="reqPayload" value="No Payload" type="STRING"/>
+                    <filter xpath="$ctx:httpMethod = 'POST' or $ctx:httpMethod = 'PUT' or $ctx:httpMethod = 'PATCH'">
                         <then>
-                            <property name="reqPayload" expression="json-eval($)" type="STRING"/>
+                            <filter regex="(?i).*json.*" source="$ctx:contentTypeStr">
+                                <then>
+                                    <property name="reqPayload" expression="json-eval($)" type="STRING"/>
+                                </then>
+                                <otherwise>
+                                    <property name="reqPayload" expression="$body/*" type="STRING"/>
+                                </otherwise>
+                            </filter>
                         </then>
-                        <otherwise>
-                            <property name="reqPayload" expression="$body/*" type="STRING"/>
-                        </otherwise>
                     </filter>
                     
-                    <property name="reqHeadersStr" 
-                            expression="fn:concat('{', 
-                                'Content-Type=', $trp:Content-Type, ', ',
-                                'X-Application-Name=', $trp:X-Application-Name, ', ',
-                                'X-User-ID=', $trp:X-User-ID, ', ',
-                                'X-Client-ID=', $trp:X-Client-ID, 
-                            '}')" 
-                            type="STRING"/>
+                    <property name="reqHeadersStr" expression="fn:concat('{Content-Type=', $trp:Content-Type, ', X-Application-Name=', $trp:X-Application-Name, ', X-User-ID=', $trp:X-User-ID, ', X-Client-ID=', $trp:X-Client-ID, '}')" type="STRING"/>
 
-                    <property name="combinedData" 
-                              expression="fn:concat('[HEADERS]&#10;', $ctx:reqHeadersStr, '&#10;[PAYLOAD]&#10;', $ctx:reqPayload)" 
-                              type="STRING"/>
+                    <property name="combinedData" expression="fn:concat('[HEADERS]&#10;', $ctx:reqHeadersStr, '&#10;[PAYLOAD]&#10;', $ctx:reqPayload)" type="STRING"/>
 
                     <dbreport>
                         <connection>
@@ -120,7 +116,7 @@
                 </then>
                 <else>
                     <log level="custom">
-                        <property name="DEBUG_STATUS" value="--- Limit Reached! (Count >= 10). Skipping DB Log. ---"/>
+                        <property name="DEBUG_STATUS" value="--- Limit Reached! (Count &gt;= 10). Skipping DB Log. ---"/>
                         <property name="API_NAME" expression="$ctx:currentApiName"/>
                         <property name="CURRENT_COUNT" expression="$ctx:apiHitCount"/>
                     </log>

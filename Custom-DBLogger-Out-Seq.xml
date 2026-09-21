@@ -10,13 +10,19 @@
             <property name="httpStatus" expression="get-property('axis2', 'HTTP_SC')" type="STRING"/>
             
             <property name="respContentTypeStr" expression="$axis2:ContentType" type="STRING"/>
-            <filter regex="(?i).*json.*" source="$ctx:respContentTypeStr">
+            <property name="respData" value="No Payload" type="STRING"/>
+            <filter xpath="$ctx:httpStatus != '204'">
                 <then>
-                    <property name="respData" expression="json-eval($)" type="STRING"/>
+                    <property name="respContentTypeStr" expression="$axis2:ContentType" type="STRING"/>
+                    <filter regex="(?i).*json.*" source="$ctx:respContentTypeStr">
+                        <then>
+                            <property name="respData" expression="json-eval($)" type="STRING"/>
+                        </then>
+                        <otherwise>
+                            <property name="respData" expression="$body/*" type="STRING"/>
+                        </otherwise>
+                    </filter>
                 </then>
-                <otherwise>
-                    <property name="respData" expression="$body/*" type="STRING"/>
-                </otherwise>
             </filter>
             
             <property name="respHeadersStr" 
