@@ -25,15 +25,24 @@
                 </then>
             </filter>
             
-            <property name="respHeadersStr" 
-                    expression="fn:concat('{', 
-                        'Content-Type=', $trp:Content-Type,
-                    '}')" 
-                    type="STRING"/>
-
-            <property name="combinedRespData" 
-                      expression="fn:concat('[HEADERS] ', $ctx:respHeadersStr, '&#10;[RESPONSE DATA] ', $ctx:respData)" 
-                      type="STRING"/>
+            <!-- เก็บ Response Header ทั้งหมดเป็น JSON (mask ค่า credential) -->
+            <script language="js"><![CDATA[
+                var SENSITIVE = ["set-cookie", "authorization", "x-api-key", "apikey"];
+                var headers = mc.getAxis2MessageContext().getProperty("TRANSPORT_HEADERS");
+                var out = {};
+                if (headers != null) {
+                    var it = headers.keySet().iterator();
+                    while (it.hasNext()) {
+                        var key = String(it.next());
+                        var value = String(headers.get(key));
+                        if (SENSITIVE.indexOf(key.toLowerCase()) >= 0) {
+                            value = "***MASKED***";
+                        }
+                        out[key] = value;
+                    }
+                }
+                mc.setProperty("respHeadersJson", JSON.stringify(out));
+            ]]></script>
             
             <property name="responseTime" expression="get-property('SYSTEM_DATE', 'yyyy-MM-dd HH:mm:ss.SSS')" type="STRING"/>
             <property name="respEndTimeMs" expression="get-property('SYSTEM_TIME')" type="LONG"/>
@@ -64,10 +73,11 @@
                 <statement>
                     <sql><![CDATA[
                         UPDATE public.api_request_log_for_migration
-                        SET RESPONSE_DATA = ?, HTTP_STATUS = ?, RESPONSE_TIME = CAST(? AS TIMESTAMP), EXECUTION_TIME_MS = CAST(? AS BIGINT)
+                        SET RESPONSE_HEADERS = ?, RESPONSE_DATA = ?, HTTP_STATUS = ?, RESPONSE_TIME = CAST(? AS TIMESTAMP), EXECUTION_TIME_MS = CAST(? AS BIGINT)
                         WHERE MESSAGE_ID = ?
                     ]]></sql>
-                    <parameter expression="$ctx:combinedRespData" type="VARCHAR"/>
+                    <parameter expression="$ctx:respHeadersJson" type="VARCHAR"/>
+                    <parameter expression="$ctx:respData" type="VARCHAR"/>
                     <parameter expression="$ctx:httpStatus" type="VARCHAR"/>
                     <parameter expression="$ctx:responseTime" type="VARCHAR"/>
                     <parameter expression="$ctx:apiDurationMs" type="VARCHAR"/>

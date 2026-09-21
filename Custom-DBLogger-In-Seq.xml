@@ -56,6 +56,7 @@
                     <property name="apiName" expression="get-property('API_NAME')" type="STRING"/>
                     <property name="apiVersion" expression="get-property('API_VERSION')" type="STRING"/>
                     <property name="fullUrl" expression="get-property('To')" type="STRING"/>
+                    <property name="resourcePath" expression="get-property('axis2', 'REST_URL_POSTFIX')" type="STRING"/>
                     <property name="httpMethod" expression="$axis2:HTTP_METHOD" type="STRING"/>
                     <property name="ReqMessageID" expression="get-property('MessageID')" scope="default" type="STRING"/>
                     <property name="contentType" expression="$trp:Content-Type" type="STRING"/>
@@ -80,9 +81,24 @@
                         </then>
                     </filter>
                     
-                    <property name="reqHeadersStr" expression="fn:concat('{Content-Type=', $trp:Content-Type, ', X-Application-Name=', $trp:X-Application-Name, ', X-User-ID=', $trp:X-User-ID, ', X-Client-ID=', $trp:X-Client-ID, '}')" type="STRING"/>
-
-                    <property name="combinedData" expression="fn:concat('[HEADERS]&#10;', $ctx:reqHeadersStr, '&#10;[PAYLOAD]&#10;', $ctx:reqPayload)" type="STRING"/>
+                    <!-- เก็บ Transport Header ทั้งหมดเป็น JSON (mask ค่า credential) เพื่อใช้ replay ใน unit test -->
+                    <script language="js"><![CDATA[
+                        var SENSITIVE = ["authorization", "cookie", "x-api-key", "apikey"];
+                        var headers = mc.getAxis2MessageContext().getProperty("TRANSPORT_HEADERS");
+                        var out = {};
+                        if (headers != null) {
+                            var it = headers.keySet().iterator();
+                            while (it.hasNext()) {
+                                var key = String(it.next());
+                                var value = String(headers.get(key));
+                                if (SENSITIVE.indexOf(key.toLowerCase()) >= 0) {
+                                    value = "***MASKED***";
+                                }
+                                out[key] = value;
+                            }
+                        }
+                        mc.setProperty("reqHeadersJson", JSON.stringify(out));
+                    ]]></script>
 
                     <dbreport>
                         <connection>
@@ -96,20 +112,22 @@
                         <statement>
                             <sql><![CDATA[
                                 INSERT INTO public.api_request_log_for_migration
-                                (MESSAGE_ID, API_NAME, API_VERSION, FULL_URL, HTTP_METHOD, CONTENT_TYPE, CLIENT_IP, APP_NAME, USER_ID, CLIENT_ID, REQUEST_DATA, REQUEST_TIME) 
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS TIMESTAMP))
+                                (MESSAGE_ID, API_NAME, API_VERSION, FULL_URL, RESOURCE_PATH, HTTP_METHOD, CONTENT_TYPE, CLIENT_IP, APP_NAME, USER_ID, CLIENT_ID, REQUEST_HEADERS, REQUEST_DATA, REQUEST_TIME) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS TIMESTAMP))
                             ]]></sql>
                             <parameter expression="$ctx:ReqMessageID" type="VARCHAR"/>
                             <parameter expression="$ctx:apiName" type="VARCHAR"/>
                             <parameter expression="$ctx:apiVersion" type="VARCHAR"/>
                             <parameter expression="$ctx:fullUrl" type="VARCHAR"/>
+                            <parameter expression="$ctx:resourcePath" type="VARCHAR"/>
                             <parameter expression="$ctx:httpMethod" type="VARCHAR"/>
                             <parameter expression="$ctx:contentType" type="VARCHAR"/>
                             <parameter expression="$ctx:clientIp" type="VARCHAR"/>
                             <parameter expression="$ctx:appName" type="VARCHAR"/>
                             <parameter expression="$ctx:userId" type="VARCHAR"/>
                             <parameter expression="$ctx:clientId" type="VARCHAR"/>
-                            <parameter expression="$ctx:combinedData" type="VARCHAR"/>
+                            <parameter expression="$ctx:reqHeadersJson" type="VARCHAR"/>
+                            <parameter expression="$ctx:reqPayload" type="VARCHAR"/>
                             <parameter expression="$ctx:requestTime" type="VARCHAR"/> 
                         </statement>
                     </dbreport>
