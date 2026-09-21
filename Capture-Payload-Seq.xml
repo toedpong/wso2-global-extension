@@ -1,0 +1,41 @@
+<sequence name="Capture-Payload-Seq" xmlns="http://ws.apache.org/ns/synapse">
+    <!--
+        แปลง body ของ message ปัจจุบันเป็น string ตาม Content-Type แล้วตั้งค่า
+          capturedPayload       : เนื้อหา body (json / xml / text / base64)
+          capturedPayloadFormat : json | xml | form | text | binary | none
+        ใช้ได้ทั้งขา In (request) และขา Out (response)
+    -->
+    <property name="capturedContentType" expression="$axis2:ContentType" type="STRING"/>
+    <property name="capturedPayload" value="No Payload" type="STRING"/>
+    <property name="capturedPayloadFormat" value="none" type="STRING"/>
+
+    <filter xpath="boolean($ctx:capturedContentType) and boolean($body/*)">
+        <then>
+            <switch source="$ctx:capturedContentType">
+                <case regex="(?i).*json.*">
+                    <property name="capturedPayloadFormat" value="json" type="STRING"/>
+                    <property name="capturedPayload" expression="json-eval($)" type="STRING"/>
+                </case>
+                <case regex="(?i).*(xml|soap).*">
+                    <property name="capturedPayloadFormat" value="xml" type="STRING"/>
+                    <property name="capturedPayload" expression="$body/*" type="STRING"/>
+                </case>
+                <case regex="(?i).*x-www-form-urlencoded.*">
+                    <!-- Synapse แปลง form เป็น <xformValues><field>value</field>...</xformValues> -->
+                    <property name="capturedPayloadFormat" value="form" type="STRING"/>
+                    <property name="capturedPayload" expression="$body/*" type="STRING"/>
+                </case>
+                <case regex="(?i)^text/.*">
+                    <!-- Synapse ห่อ text ไว้ใน <text>...</text> จึงดึงเฉพาะ text node -->
+                    <property name="capturedPayloadFormat" value="text" type="STRING"/>
+                    <property name="capturedPayload" expression="string($body/*)" type="STRING"/>
+                </case>
+                <default>
+                    <!-- octet-stream, multipart, pdf, ฯลฯ Synapse ห่อเป็น <binary>base64</binary> -->
+                    <property name="capturedPayloadFormat" value="binary" type="STRING"/>
+                    <property name="capturedPayload" expression="string($body/*)" type="STRING"/>
+                </default>
+            </switch>
+        </then>
+    </filter>
+</sequence>

@@ -9,19 +9,14 @@
             <property name="currentApiName" expression="get-property('API_NAME')" type="STRING"/>
             <property name="httpStatus" expression="get-property('axis2', 'HTTP_SC')" type="STRING"/>
             
-            <property name="respContentTypeStr" expression="$axis2:ContentType" type="STRING"/>
+            <property name="respContentType" expression="$axis2:ContentType" type="STRING"/>
             <property name="respData" value="No Payload" type="STRING"/>
+            <property name="respDataFormat" value="none" type="STRING"/>
             <filter xpath="$ctx:httpStatus != '204'">
                 <then>
-                    <property name="respContentTypeStr" expression="$axis2:ContentType" type="STRING"/>
-                    <filter regex="(?i).*json.*" source="$ctx:respContentTypeStr">
-                        <then>
-                            <property name="respData" expression="json-eval($)" type="STRING"/>
-                        </then>
-                        <otherwise>
-                            <property name="respData" expression="$body/*" type="STRING"/>
-                        </otherwise>
-                    </filter>
+                    <sequence key="Capture-Payload-Seq"/>
+                    <property name="respData" expression="$ctx:capturedPayload" type="STRING"/>
+                    <property name="respDataFormat" expression="$ctx:capturedPayloadFormat" type="STRING"/>
                 </then>
             </filter>
             
@@ -73,11 +68,13 @@
                 <statement>
                     <sql><![CDATA[
                         UPDATE public.api_request_log_for_migration
-                        SET RESPONSE_HEADERS = ?, RESPONSE_DATA = ?, HTTP_STATUS = ?, RESPONSE_TIME = CAST(? AS TIMESTAMP), EXECUTION_TIME_MS = CAST(? AS BIGINT)
+                        SET RESPONSE_HEADERS = ?, RESPONSE_DATA = ?, RESPONSE_FORMAT = ?, RESPONSE_CONTENT_TYPE = ?, HTTP_STATUS = ?, RESPONSE_TIME = CAST(? AS TIMESTAMP), EXECUTION_TIME_MS = CAST(? AS BIGINT)
                         WHERE MESSAGE_ID = ?
                     ]]></sql>
                     <parameter expression="$ctx:respHeadersJson" type="VARCHAR"/>
                     <parameter expression="$ctx:respData" type="VARCHAR"/>
+                    <parameter expression="$ctx:respDataFormat" type="VARCHAR"/>
+                    <parameter expression="$ctx:respContentType" type="VARCHAR"/>
                     <parameter expression="$ctx:httpStatus" type="VARCHAR"/>
                     <parameter expression="$ctx:responseTime" type="VARCHAR"/>
                     <parameter expression="$ctx:apiDurationMs" type="VARCHAR"/>
