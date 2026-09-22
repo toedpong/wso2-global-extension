@@ -140,4 +140,4 @@ class CpiClient:
 
     def deploy_iflow(self, iid):
         return self._post(f"{self.config.base_url}/api/v1/DeployIntegrationDesigntimeArtifact"
-                          f"?Id='{iid}'&Version='active'").json()
+                          f"?Id='{iid}'&Version='active'").text

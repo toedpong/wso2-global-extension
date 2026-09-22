@@ -56,3 +56,26 @@ python tools/export_fixtures.py --out fixtures --api OR_HR_ZHRHRI001        # �
 ```
 
 ใช้ `request` ยิงเข้า iFlow บน CPI แล้วเทียบผลกับ `expected_response`
+
+## pi2cpi — Migration tool (PI/PO interface หลัง WSO2 → SAP CPI)
+
+```sh
+pip install -r tools/requirements.txt
+export WSO2_BASE_URL=https://apim:9443 WSO2_USERNAME=admin WSO2_PASSWORD=... WSO2_VERIFY_TLS=false
+export WSO2_GATEWAY_ENV=Default WSO2_VHOST=localhost
+export CPI_BASE_URL=https://<tenant>.it-cpi0xx.cfapps.<region>.hana.ondemand.com   # design-time API
+export CPI_RUNTIME_URL=https://<tenant>.it-cpi0xx-rt.cfapps.<region>.hana.ondemand.com
+export CPI_TOKEN_URL=... CPI_CLIENT_ID=... CPI_CLIENT_SECRET=...
+```
+
+| คำสั่ง | หน้าที่ |
+| --- | --- |
+| `python -m tools.pi2cpi inventory --from-migration-list MigrationAPIList.xml --out inv` | ดึง API จาก Publisher REST API v3, แยก backend ที่เป็น PI/PO (XISOAPAdapter / RESTAdapter / adapter_plain) → `inventory.json` + `inventory.csv` (`--all` เอา non-PI ด้วย, `--swagger-dir` dump swagger) |
+| `python -m tools.pi2cpi generate --inventory inv/inventory.json --out iflows [--receiver soap\|rfc] [--upload --package-id PKG] [--deploy]` | สร้าง CPI iFlow package (.zip) ต่อ API: HTTPS sender `/http/<API_NAME>` → Content Modifier (mapping placeholder) → Request Reply → receiver SOAP/RFC ที่ externalize parameter ไว้ (`Receiver_Address`, `Receiver_Credential`, `Receiver_RFC_Destination`) และ upload/deploy ผ่าน CPI OData API ได้ |
+| `python -m tools.pi2cpi cutover --inventory inv/inventory.json --api OR_HR_ZHRHRI001 [--dry-run] [--include-sandbox]` | สลับ production endpoint บน WSO2 จาก PI → `CPI_RUNTIME_URL/http/<API_NAME>` แล้ว create + deploy revision; เก็บ endpointConfig เดิมไว้ใน `cutover-state.json` |
+| `python -m tools.pi2cpi rollback [--api NAME]` | คืน endpointConfig เดิมจาก state file + deploy revision ใหม่ |
+| `python -m tools.pi2cpi verify --fixtures fixtures --base-url https://<cpi-rt> --path-mode cpi --header "Authorization: Bearer ..."` | ยิง fixtures จาก `export_fixtures.py` แล้วเทียบ status/body (json deep-compare, xml canonical, text, binary) → `verify-report.json/.md`, exit 1 ถ้ามี fail |
+
+iFlow ที่ generate เป็น skeleton — ต้องเปิดใน CPI Web UI เพื่อใส่ message mapping จริง แล้วค่อย `verify` ก่อน `cutover`
+
+Tests: `pip install -r tools/requirements-dev.txt && python -m pytest tools/pi2cpi/tests -q`
