@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                   xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                   xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                   xmlns:ifl="http:///com.sap.ifl.model/Ifl.xsd"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   id="Definitions_1">
+  <bpmn2:collaboration id="Collaboration_1" name="Default Collaboration">
+    <bpmn2:documentation id="Documentation_1" textFormat="text/plain">{{DESCRIPTION}}</bpmn2:documentation>
+    <bpmn2:extensionElements>
+      <ifl:property><key>namespaceMapping</key><value></value></ifl:property>
+      <ifl:property><key>allowedHeaderList</key><value>*</value></ifl:property>
+      <ifl:property><key>httpSessionHandling</key><value>None</value></ifl:property>
+      <ifl:property><key>ServerTrace</key><value>false</value></ifl:property>
+      <ifl:property><key>returnExceptionToSender</key><value>true</value></ifl:property>
+      <ifl:property><key>log</key><value>All events</value></ifl:property>
+      <ifl:property><key>componentVersion</key><value>1.1</value></ifl:property>
+      <ifl:property><key>cmdVariantUri</key><value>ctype::IFlowVariant/cname::IFlowConfiguration/version::1.1.17</value></ifl:property>
+    </bpmn2:extensionElements>
+    <bpmn2:participant id="Participant_Sender" ifl:type="EndpointSender" name="WSO2 APIM">
+      <bpmn2:extensionElements>
+        <ifl:property><key>enableBasicAuthentication</key><value>false</value></ifl:property>
+        <ifl:property><key>ifl:type</key><value>EndpointSender</value></ifl:property>
+      </bpmn2:extensionElements>
+    </bpmn2:participant>
+    <bpmn2:participant id="Participant_Receiver" ifl:type="EndpointRecevier" name="{{RECEIVER_NAME}}">
+      <bpmn2:extensionElements>
+        <ifl:property><key>ifl:type</key><value>EndpointRecevier</value></ifl:property>
+      </bpmn2:extensionElements>
+    </bpmn2:participant>
+    <bpmn2:participant id="Participant_Process_1" ifl:type="IntegrationProcess" name="Integration Process" processRef="Process_1">
+      <bpmn2:extensionElements/>
+    </bpmn2:participant>
+    <bpmn2:messageFlow id="MessageFlow_Sender" name="HTTPS" sourceRef="Participant_Sender" targetRef="StartEvent_1">
+      <bpmn2:extensionElements>
+        <ifl:property><key>ComponentType</key><value>HTTPS</value></ifl:property>
+        <ifl:property><key>Name</key><value>HTTPS</value></ifl:property>
+        <ifl:property><key>ComponentNS</key><value>sap</value></ifl:property>
+        <ifl:property><key>TransportProtocol</key><value>HTTPS</value></ifl:property>
+        <ifl:property><key>MessageProtocol</key><value>None</value></ifl:property>
+        <ifl:property><key>direction</key><value>Sender</value></ifl:property>
+        <ifl:property><key>componentVersion</key><value>1.5</value></ifl:property>
+        <ifl:property><key>cmdVariantUri</key><value>ctype::AdapterVariant/cname::sap:HTTPS/tp::HTTPS/mp::None/direction::Sender/version::1.5.1</value></ifl:property>
+        <ifl:property><key>urlPath</key><value>{{SENDER_URL_PATH}}</value></ifl:property>
+        <ifl:property><key>senderAuthType</key><value>RoleBased</value></ifl:property>
+        <ifl:property><key>userRole</key><value>ESBMessaging.send</value></ifl:property>
+        <ifl:property><key>csrfProtection</key><value>false</value></ifl:property>
+        <ifl:property><key>maximumBodySize</key><value>40</value></ifl:property>
+        <ifl:property><key>system</key><value>WSO2 APIM</value></ifl:property>
+      </bpmn2:extensionElements>
+    </bpmn2:messageFlow>
+    <bpmn2:messageFlow id="MessageFlow_Receiver" name="{{RECEIVER_ADAPTER_NAME}}" sourceRef="ServiceTask_RequestReply" targetRef="Participant_Receiver">
+      <bpmn2:extensionElements>
+{{RECEIVER_ADAPTER_PROPERTIES}}
+      </bpmn2:extensionElements>
+    </bpmn2:messageFlow>
+  </bpmn2:collaboration>
+  <bpmn2:process id="Process_1" name="Integration Process">
+    <bpmn2:extensionElements>
+      <ifl:property><key>transactionTimeout</key><value>30</value></ifl:property>
+      <ifl:property><key>componentVersion</key><value>1.2</value></ifl:property>
+      <ifl:property><key>cmdVariantUri</key><value>ctype::FlowElementVariant/cname::IntegrationProcess/version::1.2.1</value></ifl:property>
+      <ifl:property><key>transactionalHandling</key><value>Not Required</value></ifl:property>
+    </bpmn2:extensionElements>
+    <bpmn2:startEvent id="StartEvent_1" name="Start">
+      <bpmn2:extensionElements>
+        <ifl:property><key>componentVersion</key><value>1.0</value></ifl:property>
+        <ifl:property><key>cmdVariantUri</key><value>ctype::FlowstepVariant/cname::MessageStartEvent/version::1.0</value></ifl:property>
+      </bpmn2:extensionElements>
+      <bpmn2:outgoing>SequenceFlow_1</bpmn2:outgoing>
+      <bpmn2:messageEventDefinition/>
+    </bpmn2:startEvent>
+    <bpmn2:callActivity id="CallActivity_RequestMapping" name="Request Mapping (TODO)">
+      <bpmn2:extensionElements>
+        <ifl:property><key>bodyType</key><value>expression</value></ifl:property>
+        <ifl:property><key>componentVersion</key><value>1.5</value></ifl:property>
+        <ifl:property><key>activityType</key><value>Enricher</value></ifl:property>
+        <ifl:property><key>cmdVariantUri</key><value>ctype::FlowstepVariant/cname::Enricher/version::1.5.0</value></ifl:property>
+        <ifl:property><key>wrapContent</key><value></value></ifl:property>
+        <ifl:property><key>headerTable</key><value>&lt;row&gt;&lt;cell id='Action'&gt;Create&lt;/cell&gt;&lt;cell id='Type'&gt;constant&lt;/cell&gt;&lt;cell id='Value'&gt;{{PI_INTERFACE}}&lt;/cell&gt;&lt;cell id='Default'&gt;&lt;/cell&gt;&lt;cell id='Name'&gt;SAP_PI_Interface&lt;/cell&gt;&lt;cell id='Datatype'&gt;&lt;/cell&gt;&lt;/row&gt;</value></ifl:property>
+        <ifl:property><key>propertyTable</key><value>&lt;row&gt;&lt;cell id='Action'&gt;Create&lt;/cell&gt;&lt;cell id='Type'&gt;constant&lt;/cell&gt;&lt;cell id='Value'&gt;{{API_NAME}}&lt;/cell&gt;&lt;cell id='Default'&gt;&lt;/cell&gt;&lt;cell id='Name'&gt;WSO2_API_Name&lt;/cell&gt;&lt;cell id='Datatype'&gt;&lt;/cell&gt;&lt;/row&gt;</value></ifl:property>
+      </bpmn2:extensionElements>
+      <bpmn2:incoming>SequenceFlow_1</bpmn2:incoming>
+      <bpmn2:outgoing>SequenceFlow_2</bpmn2:outgoing>
+    </bpmn2:callActivity>
+    <bpmn2:serviceTask id="ServiceTask_RequestReply" name="Request Reply">
+      <bpmn2:extensionElements>
+        <ifl:property><key>componentVersion</key><value>1.0</value></ifl:property>
+        <ifl:property><key>activityType</key><value>ExternalCall</value></ifl:property>
+        <ifl:property><key>cmdVariantUri</key><value>ctype::FlowstepVariant/cname::ExternalCall/version::1.0.4</value></ifl:property>
+      </bpmn2:extensionElements>
+      <bpmn2:incoming>SequenceFlow_2</bpmn2:incoming>
+      <bpmn2:outgoing>SequenceFlow_3</bpmn2:outgoing>
+    </bpmn2:serviceTask>
+    <bpmn2:endEvent id="EndEvent_1" name="End">
+      <bpmn2:extensionElements>
+        <ifl:property><key>componentVersion</key><value>1.1</value></ifl:property>
+        <ifl:property><key>cmdVariantUri</key><value>ctype::FlowstepVariant/cname::MessageEndEvent/version::1.1.0</value></ifl:property>
+      </bpmn2:extensionElements>
+      <bpmn2:incoming>SequenceFlow_3</bpmn2:incoming>
+      <bpmn2:messageEventDefinition/>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="SequenceFlow_1" sourceRef="StartEvent_1" targetRef="CallActivity_RequestMapping"/>
+    <bpmn2:sequenceFlow id="SequenceFlow_2" sourceRef="CallActivity_RequestMapping" targetRef="ServiceTask_RequestReply"/>
+    <bpmn2:sequenceFlow id="SequenceFlow_3" sourceRef="ServiceTask_RequestReply" targetRef="EndEvent_1"/>
+  </bpmn2:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1" name="Default Collaboration Diagram">
+    <bpmndi:BPMNPlane bpmnElement="Collaboration_1" id="BPMNPlane_1">
+      <bpmndi:BPMNShape bpmnElement="Participant_Sender" id="BPMNShape_Participant_Sender">
+        <dc:Bounds height="140.0" width="100.0" x="40.0" y="100.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="Participant_Receiver" id="BPMNShape_Participant_Receiver">
+        <dc:Bounds height="140.0" width="100.0" x="900.0" y="100.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="Participant_Process_1" id="BPMNShape_Participant_Process_1">
+        <dc:Bounds height="220.0" width="640.0" x="200.0" y="60.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="StartEvent_1" id="BPMNShape_StartEvent_1">
+        <dc:Bounds height="32.0" width="32.0" x="250.0" y="140.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="CallActivity_RequestMapping" id="BPMNShape_CallActivity_RequestMapping">
+        <dc:Bounds height="60.0" width="100.0" x="350.0" y="126.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="ServiceTask_RequestReply" id="BPMNShape_ServiceTask_RequestReply">
+        <dc:Bounds height="60.0" width="100.0" x="520.0" y="126.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="EndEvent_1" id="BPMNShape_EndEvent_1">
+        <dc:Bounds height="32.0" width="32.0" x="720.0" y="140.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="SequenceFlow_1" id="BPMNEdge_SequenceFlow_1" sourceElement="BPMNShape_StartEvent_1" targetElement="BPMNShape_CallActivity_RequestMapping">
+        <di:waypoint x="282.0" xsi:type="dc:Point" y="156.0"/>
+        <di:waypoint x="350.0" xsi:type="dc:Point" y="156.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="SequenceFlow_2" id="BPMNEdge_SequenceFlow_2" sourceElement="BPMNShape_CallActivity_RequestMapping" targetElement="BPMNShape_ServiceTask_RequestReply">
+        <di:waypoint x="450.0" xsi:type="dc:Point" y="156.0"/>
+        <di:waypoint x="520.0" xsi:type="dc:Point" y="156.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="SequenceFlow_3" id="BPMNEdge_SequenceFlow_3" sourceElement="BPMNShape_ServiceTask_RequestReply" targetElement="BPMNShape_EndEvent_1">
+        <di:waypoint x="620.0" xsi:type="dc:Point" y="156.0"/>
+        <di:waypoint x="720.0" xsi:type="dc:Point" y="156.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="MessageFlow_Sender" id="BPMNEdge_MessageFlow_Sender" sourceElement="BPMNShape_Participant_Sender" targetElement="BPMNShape_StartEvent_1">
+        <di:waypoint x="140.0" xsi:type="dc:Point" y="170.0"/>
+        <di:waypoint x="250.0" xsi:type="dc:Point" y="156.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="MessageFlow_Receiver" id="BPMNEdge_MessageFlow_Receiver" sourceElement="BPMNShape_ServiceTask_RequestReply" targetElement="BPMNShape_Participant_Receiver">
+        <di:waypoint x="620.0" xsi:type="dc:Point" y="156.0"/>
+        <di:waypoint x="900.0" xsi:type="dc:Point" y="170.0"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn2:definitions>
